@@ -51,6 +51,7 @@ function addNames () {
     feed.add({
       type: 'contact',
       contact: {feed: feed.id},
+      follow: true,
       name: feed.name, voice: feed.voice
     }, function () { cb(null, feed) })
   })
@@ -104,7 +105,7 @@ var config = {
 
 module.exports = function (ssb, main, cb) {
 
-  var seed = ''
+  var seed = config, count = 0, key = 0
 
   var root = hash(seed)
 
@@ -115,7 +116,7 @@ module.exports = function (ssb, main, cb) {
   pull(
     pull.count(1000), //config.feeds),
     pull.map(function () {
-      var feed = ssb.createFeed(ssbKeys.generate('ed25519', hash(seed + last)))
+      var feed = ssb.createFeed(ssbKeys.generate('ed25519', hash(seed + ++key))
       feeds.push(feed)
       last = feed.id
       return feed
@@ -130,7 +131,9 @@ module.exports = function (ssb, main, cb) {
           return randA(feeds)
         }),
         addMessage(feeds),
-        pull.drain(console.log, cb)
+        pull.drain(function () {
+          console.log(++count)
+        }, cb)
       )
 
     })
