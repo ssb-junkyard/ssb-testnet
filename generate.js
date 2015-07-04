@@ -98,25 +98,38 @@ function addMessage (feeds) {
 }
 
 var config = {
-  feeds: 1000,
-  messages: 100000,
+  feeds: 1500,
+  messages: 200000,
   seed: 'generate test networks key, [add your own entropy here]'
+}
+
+function flowMeter (log, slice) {
+  var count = 0, slice_count = 0, ts
+  return pull.through(function (data) {
+    count ++; slice_count++
+    if(!ts) ts = Date.now()
+    if(Date.now() > ts + slice) {
+      log(count, slice_count, slice_count/slice)
+      ts = Date.now(); slice_count = 0
+    }
+  })
+
 }
 
 module.exports = function (ssb, main, cb) {
 
-  var seed = config, count = 0, key = 0
+  var count = 0, key = 0
 
-  var root = hash(seed)
+  var root = hash(config.seed)
 
   var last = ''
 
   var feeds = []
 
   pull(
-    pull.count(1000), //config.feeds),
+    pull.count(config.feeds),
     pull.map(function () {
-      var feed = ssb.createFeed(ssbKeys.generate('ed25519', hash(seed + ++key))
+      var feed = ssb.createFeed(ssbKeys.generate('ed25519', hash(config.seed + ++key)))
       feeds.push(feed)
       last = feed.id
       return feed
@@ -124,16 +137,15 @@ module.exports = function (ssb, main, cb) {
     addNames(),
     pull.collect(function (err, feeds) {
       if(err) throw err
-
+      if(!feeds.length) throw new Error('feed generation failed')
       pull(
         pull.count(config.messages),
         pull.map(function (n) {
           return randA(feeds)
         }),
         addMessage(feeds),
-        pull.drain(function () {
-          console.log(++count)
-        }, cb)
+        flowMeter(console.log, 1000),
+        pull.drain(null, cb)
       )
 
     })
@@ -144,5 +156,6 @@ module.exports = function (ssb, main, cb) {
 sbot.init(require('./config'), function (err, sbot) {
   module.exports(sbot.ssb, sbot.feed, function () {
     console.log('generated!')
+    sbot.close()
   })
 })
