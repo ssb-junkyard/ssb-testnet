@@ -51,7 +51,7 @@ function addNames () {
     feed.add({
       type: 'contact',
       contact: {feed: feed.id},
-      follow: true,
+      following: true,
       name: feed.name, voice: feed.voice
     }, function () { cb(null, feed) })
   })
@@ -116,6 +116,13 @@ function flowMeter (log, slice) {
 
 }
 
+function initFeed(feed) {
+  feed.name = randomName()
+  feed.voice = keys.shift()
+  keys.push(feed.voice)
+  return feed
+}
+
 module.exports = function (ssb, main, cb) {
 
   var count = 0, key = 0
@@ -124,13 +131,13 @@ module.exports = function (ssb, main, cb) {
 
   var last = ''
 
-  var feeds = []
 
   pull(
     pull.count(config.feeds),
     pull.map(function () {
-      var feed = ssb.createFeed(ssbKeys.generate('ed25519', hash(config.seed + ++key)))
-      feeds.push(feed)
+      var keys = ssbKeys.generate('ed25519', hash(config.seed + ++key))
+      var feed = initFeed(ssb.createFeed(keys))
+
       last = feed.id
       return feed
     }),
@@ -138,6 +145,9 @@ module.exports = function (ssb, main, cb) {
     pull.collect(function (err, feeds) {
       if(err) throw err
       if(!feeds.length) throw new Error('feed generation failed')
+
+      feeds.push(initFeed(main))
+
       pull(
         pull.count(config.messages),
         pull.map(function (n) {
@@ -157,5 +167,6 @@ sbot.init(require('./config'), function (err, sbot) {
   module.exports(sbot.ssb, sbot.feed, function () {
     console.log('generated!')
     sbot.close()
+    process.exit(0)
   })
 })
